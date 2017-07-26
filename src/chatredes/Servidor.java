@@ -36,6 +36,7 @@ public class Servidor {
         salas.add(new Sala("sala 1", "127.0.0.1"));
         salas.add(new Sala("sala 2", "127.0.0.1"));
         salas.add(new Sala("sala 3", "127.0.0.1"));
+        salas.add(new Sala("sala 4", "127.0.0.1"));
 
         // criando o receptor de mensagens UDP
         Runnable receptorUDP;
