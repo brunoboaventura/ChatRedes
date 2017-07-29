@@ -3,8 +3,10 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package chatredes;
+package client;
 
+import com.sun.org.apache.bcel.internal.classfile.Utility;
+import server.Room;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -97,7 +99,7 @@ public class LoginWindow extends javax.swing.JFrame {
                     .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, 37, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
                 .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 40, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(63, Short.MAX_VALUE))
+                .addContainerGap(30, Short.MAX_VALUE))
         );
 
         pack();
@@ -111,7 +113,9 @@ public class LoginWindow extends javax.swing.JFrame {
         // TODO add your handling code here:
         Properties props = new Properties();
         try {
-            props.load(getClass().getResourceAsStream("Chat.properties"));
+       
+            //props.load(getClass().getResourceAsStream("Chat.properties"));
+            props.load(Utility.class.getResourceAsStream("/config/Chat.properties"));
         } catch (IOException ex) {
             Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -126,7 +130,7 @@ public class LoginWindow extends javax.swing.JFrame {
             ArrayList salas = (ArrayList) entrada.readObject();
 
             for (int i = 0; i < salas.size(); i++) {
-                jComboBox1.addItem(((Sala) salas.get(i)).nome);
+                jComboBox1.addItem(((Room) salas.get(i)).getNome());
             }
 
         } catch (IOException ex) {

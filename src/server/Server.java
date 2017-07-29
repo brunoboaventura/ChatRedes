@@ -1,4 +1,4 @@
-package chatredes;
+package server;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -15,7 +15,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Servidor {
+
+public class Server {
 
     private static final int PORTA_TCP = 5000;
     private static final int PORTA_TCPF = 5001;
@@ -33,10 +34,10 @@ public class Servidor {
         // Lista de salas com os endereços multicast de cada uma
         ArrayList salas = new ArrayList();
 
-        salas.add(new Sala("sala 1", "127.0.0.1"));
-        salas.add(new Sala("sala 2", "127.0.0.1"));
-        salas.add(new Sala("sala 3", "127.0.0.1"));
-        salas.add(new Sala("sala 4", "127.0.0.1"));
+        salas.add(new Room("sala 11", "127.0.0.1"));
+        salas.add(new Room("sala 22", "127.0.0.1"));
+        salas.add(new Room("sala 33", "127.0.0.1"));
+        salas.add(new Room("sala 44", "127.0.0.1"));
 
         // criando o receptor de mensagens UDP
         Runnable receptorUDP;
@@ -47,7 +48,7 @@ public class Servidor {
                 ds = new DatagramSocket(PORTA_UDP);
 
             } catch (SocketException ex) {
-                Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
             }
 //            byte[] msg = new byte[10];
 //
@@ -85,7 +86,7 @@ public class Servidor {
                     saida.flush();
                     saida.writeObject(salas);
                 } catch (IOException ex) {
-                    Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
 
                 }
 
@@ -94,16 +95,16 @@ public class Servidor {
                     entrada = new ObjectInputStream(cliente.getInputStream());
                     String nickname = (String) entrada.readObject();
 
-                    ClienteData cli = new ClienteData(nickname, cliente, cliente.getInetAddress().getHostAddress(), 5002, 5003);
+                    ClientData cli = new ClientData(nickname, cliente, cliente.getInetAddress().getHostAddress(), 5002, 5003);
 
                     clientes.add(cli);
                     
                     System.out.println (nickname);
 
                 } catch (IOException ex) {
-                    Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (ClassNotFoundException ex) {
-                    Logger.getLogger(Servidor.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                 }
 
             };
