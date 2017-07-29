@@ -11,7 +11,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Stack;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,66 +25,42 @@ public class Server {
 
     public static void main(String argv[]) throws Exception {
 
-        // pilha para as mensagens
-        ArrayBlockingQueue pilha = new ArrayBlockingQueue(5);
+        // fila (FIFO) para as mensagens (thread safe)
+        ConcurrentLinkedQueue fifo = new ConcurrentLinkedQueue();
 
         // Lista de clientes conectados
-        ArrayList clientes = new ArrayList();
+        ArrayList clients = new ArrayList();
 
         // Lista de salas com os endereços multicast de cada uma
-        ArrayList salas = new ArrayList();
+        ArrayList rooms = new ArrayList();
 
-        salas.add(new Room("sala 11", "127.0.0.1"));
-        salas.add(new Room("sala 22", "127.0.0.1"));
-        salas.add(new Room("sala 33", "127.0.0.1"));
-        salas.add(new Room("sala 44", "127.0.0.1"));
-
-        // criando o receptor de mensagens UDP
-        Runnable receptorUDP;
-        receptorUDP = () -> {
-
-            DatagramSocket ds = null;
-            try {
-                ds = new DatagramSocket(PORTA_UDP);
-
-            } catch (SocketException ex) {
-                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-            }
-//            byte[] msg = new byte[10];
-//
-//            DatagramPacket pkg = new DatagramPacket(msg, msg.length);
-//
-//            try {
-//                ds.receive(pkg);
-//            } catch (IOException ex) {
-//                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-//            }rootPaneCheckingEnabled
-//
-//            System.out.println(pkg.getData().toString());
-            ds.close();
-        };
-
-        Thread t = new Thread(receptorUDP);
-        t.start();
+        // Criando as salas
+        rooms.add(new Room("sala 11", "127.0.0.1"));
+        rooms.add(new Room("sala 22", "127.0.0.1"));
+        rooms.add(new Room("sala 33", "127.0.0.1"));
+        rooms.add(new Room("sala 44", "127.0.0.1"));
 
         // socket TCP principal, onde o cliente se conecta
+        // por esse socket o cliente receberá as salas disponíveis e
+        // enviará os pedidos TCP:
+       
         ServerSocket socketTCP;
         socketTCP = new ServerSocket(PORTA_TCP);
 
+        // servidor fica em loop aguardando conexões
         while (true) {
 
             Socket cliente = socketTCP.accept();
 
+            // ao aceitar uma conexão, o servidor cria uma thread que vai
+            // enviar a lista de salas 
             Runnable tratarCliente;
             tratarCliente = () -> {
-                System.out.println("Nova conexão com o cliente "
-                        + cliente.getInetAddress().getHostAddress());
-
-                ObjectOutputStream saida = null;
+                ObjectOutputStream saida;
                 try {
                     saida = new ObjectOutputStream(cliente.getOutputStream());
                     saida.flush();
-                    saida.writeObject(salas);
+                    saida.writeObject(rooms);
                 } catch (IOException ex) {
                     Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
 
@@ -97,19 +73,17 @@ public class Server {
 
                     ClientData cli = new ClientData(nickname, cliente, cliente.getInetAddress().getHostAddress(), 5002, 5003);
 
-                    clientes.add(cli);
+                    clients.add(cli);
                     
                     System.out.println (nickname);
 
-                } catch (IOException ex) {
-                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (ClassNotFoundException ex) {
+                } catch (IOException | ClassNotFoundException ex) {
                     Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                 }
 
             };
 
-            t = new Thread(tratarCliente);
+            Thread t = new Thread(tratarCliente);
             t.start();
         }
 

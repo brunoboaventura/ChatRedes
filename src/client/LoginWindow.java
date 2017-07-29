@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package client;
 
 import com.sun.org.apache.bcel.internal.classfile.Utility;
@@ -18,10 +13,6 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- *
- * @author bruno
- */
 public class LoginWindow extends javax.swing.JFrame {
 
     /**
@@ -110,18 +101,20 @@ public class LoginWindow extends javax.swing.JFrame {
     }//GEN-LAST:event_jTextField1ActionPerformed
 
     private void formWindowActivated(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowActivated
-        // TODO add your handling code here:
+        
+        String ip = null;
+        String port = null;
+        
         Properties props = new Properties();
         try {
-       
-            //props.load(getClass().getResourceAsStream("Chat.properties"));
-            props.load(Utility.class.getResourceAsStream("/config/Chat.properties"));
+            props.load(getClass().getResourceAsStream("/config/Chat.properties"));
+
+            ip = props.getProperty("chat.server.ip");
+            port = props.getProperty("chat.port.tcp");
+
         } catch (IOException ex) {
             Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-        String ip = props.getProperty("chat.server.ip");
-        String port = props.getProperty("chat.server.port.tcp");
 
         try {
             serverSocket = new Socket(ip, Integer.parseInt(port));
@@ -133,9 +126,7 @@ public class LoginWindow extends javax.swing.JFrame {
                 jComboBox1.addItem(((Room) salas.get(i)).getNome());
             }
 
-        } catch (IOException ex) {
-            Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ClassNotFoundException ex) {
+        } catch (IOException | ClassNotFoundException ex) {
             Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_formWindowActivated
@@ -147,7 +138,7 @@ public class LoginWindow extends javax.swing.JFrame {
         window.setVisible(true);
         this.setVisible(false);
 
-        ObjectOutputStream saida = null;
+        ObjectOutputStream saida;
         try {
             saida = new ObjectOutputStream(serverSocket.getOutputStream());
             saida.writeObject(this.jTextField1.getText());
