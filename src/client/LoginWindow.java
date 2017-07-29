@@ -25,7 +25,7 @@ public class LoginWindow extends javax.swing.JFrame {
 
         // centralizar a janela
         Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
-        this.setLocation(dim.width / 2 - this.getSize().width / 2, dim.height / 2 - this.getSize().height / 2);
+        setLocation(dim.width / 2 - getSize().width / 2, dim.height / 2 - getSize().height / 2);
     }
 
     /**
@@ -149,14 +149,14 @@ public class LoginWindow extends javax.swing.JFrame {
                 && !(nickname.equals("todos"))
                 ) {
             ChatWindow window = new ChatWindow();
-            window.socket = this.serverSocket;
+            window.socket = serverSocket;
             window.setVisible(true);
-            this.setVisible(false);
+            setVisible(false);
 
             ObjectOutputStream saida;
             try {
                 saida = new ObjectOutputStream(serverSocket.getOutputStream());
-                saida.writeObject(this.jTextField1.getText());
+                saida.writeObject(jTextField1.getText());
             } catch (IOException ex) {
                 Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
             }
