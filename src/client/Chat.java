@@ -1,6 +1,6 @@
 package client;
 
-public class Client {
+public class Chat {
 
     public static void main(String[] args) {
         /* Set the Nimbus look and feel */

@@ -10,43 +10,68 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
+import java.util.Properties;
 import java.util.Stack;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
 public class Server {
 
-    private static final int PORTA_TCP = 5000;
-    private static final int PORTA_TCPF = 5001;
-    private static final int PORTA_UDP = 5002;
-    private static final int PORTA_MCAST = 5003;
+    // portas do chat (serão lidas do Chat.properties)
+    private static int tcpPort;
+    private static int udpPort;
+    private static int mcastPort;
 
-    public static void main(String argv[]) throws Exception {
+    // fila (FIFO) para as mensagens (thread safe)
+    private final ConcurrentLinkedQueue fifo = new ConcurrentLinkedQueue();
 
-        // fila (FIFO) para as mensagens (thread safe)
-        ConcurrentLinkedQueue fifo = new ConcurrentLinkedQueue();
+    // lista de clientes conectados
+    private final ArrayList clients = new ArrayList();
 
-        // Lista de clientes conectados
-        ArrayList clients = new ArrayList();
+    // lista de salas com os endereços multicast de cada uma
+    private ArrayList rooms = new ArrayList();
 
-        // Lista de salas com os endereços multicast de cada uma
-        ArrayList rooms = new ArrayList();
+    // socket TCP principal, onde o cliente se conecta
+    // por esse socket o cliente receberá as salas disponíveis e
+    // enviará os pedidos TCP:
+    private ServerSocket socketTCP;
 
-        // Criando as salas
+    public Server() throws IOException {
+        setPorts();
+
+        // criando as salas
         rooms.add(new Room("sala 11", "127.0.0.1"));
         rooms.add(new Room("sala 22", "127.0.0.1"));
         rooms.add(new Room("sala 33", "127.0.0.1"));
         rooms.add(new Room("sala 44", "127.0.0.1"));
 
-        // socket TCP principal, onde o cliente se conecta
-        // por esse socket o cliente receberá as salas disponíveis e
-        // enviará os pedidos TCP:
-       
-        ServerSocket socketTCP;
-        socketTCP = new ServerSocket(PORTA_TCP);
+        // criando o socket
+        socketTCP = new ServerSocket(tcpPort);
+        
+        // executando o loop principal, que vai escutar a porta TCP e devolver
+        // a lista de salas para o usuário, bem como criar as threads para o
+        // tratamento das mensagens (conexao e desconexao) e envio de arquivos
+        mainLoop();
 
+    }
+
+    // ler as salas do arquivo rooms.xml
+    private void setRooms() {
+
+    }
+
+    // funcao para ler as portas do arquivo Chat.properties
+    private void setPorts() throws IOException {
+        Properties props = new Properties();
+        props.load(getClass().getResourceAsStream("/config/Chat.properties"));
+
+        tcpPort = Integer.parseInt(props.getProperty("chat.port.tcp"));
+        udpPort = Integer.parseInt(props.getProperty("chat.port.udp"));
+        mcastPort = Integer.parseInt(props.getProperty("chat.port.mcast"));
+    }
+
+    private void mainLoop() throws IOException {
         // servidor fica em loop aguardando conexões
         while (true) {
 
@@ -54,62 +79,49 @@ public class Server {
 
             // ao aceitar uma conexão, o servidor cria uma thread que vai
             // enviar a lista de salas 
-            Runnable tratarCliente;
-            tratarCliente = () -> {
-                ObjectOutputStream saida;
+            Runnable sendRooms;
+            sendRooms = () -> {
+                ObjectOutputStream outputStream;
                 try {
-                    saida = new ObjectOutputStream(cliente.getOutputStream());
-                    saida.flush();
-                    saida.writeObject(rooms);
+                    outputStream = new ObjectOutputStream(cliente.getOutputStream());
+                    outputStream.flush();
+                    outputStream.writeObject(rooms);
                 } catch (IOException ex) {
-                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-
-                }
-
-                ObjectInputStream entrada = null;
-                try {
-                    entrada = new ObjectInputStream(cliente.getInputStream());
-                    String nickname = (String) entrada.readObject();
-
-                    ClientData cli = new ClientData(nickname, cliente, cliente.getInetAddress().getHostAddress(), 5002, 5003);
-
-                    clients.add(cli);
-                    
-                    System.out.println (nickname);
-
-                } catch (IOException | ClassNotFoundException ex) {
                     Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                 }
 
             };
 
-            Thread t = new Thread(tratarCliente);
-            t.start();
+            Thread tSendRooms = new Thread(sendRooms);
+            tSendRooms.start();
+                
+
+                
+
+//                ObjectInputStream entrada = null;
+//                try {
+//                    entrada = new ObjectInputStream(cliente.getInputStream());
+//                    String nickname = (String) entrada.readObject();
+//
+//                    ClientData cli = new ClientData(
+//                            nickname,
+//                            cliente,
+//                            cliente.getInetAddress().getHostAddress()
+//                    );
+//
+//                    clients.add(cli);
+//
+//                    System.out.println(nickname);
+//
+//                } catch (IOException | ClassNotFoundException ex) {
+//                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+//                }
+
         }
 
-//        Runnable enviaMensagens;
-//        enviaMensagens = () -> {
-//            if (!pilha.isEmpty()) {
-//                System.out.println(pilha.poll());
-//            }
-//        };
-//
-//        Thread t = new Thread(enviaMensagens);
-//        t.start();
-//
-//        Runnable enviaSalas;
-//        enviaSalas = () -> {
-//            try {
-//                String salas = "sala1:224.225.226.227;sala2:224.225.226.228";
-//                byte[] b = salas.getBytes();
-//                InetAddress addr = InetAddress.getByName("224.225.226.227");
-//                DatagramSocket ds = new DatagramSocket();
-//                DatagramPacket pkg = new DatagramPacket(b, b.length, addr, PORTA_MCAST);
-//                ds.send(pkg);
-//            } catch (Exception e) {
-//                System.out.println("Nao foi possivel enviar a mensagem");
-//            }
-//        };
     }
 
+    public static void main(String argv[]) throws Exception {
+        Server serv = new Server();
+    }
 }

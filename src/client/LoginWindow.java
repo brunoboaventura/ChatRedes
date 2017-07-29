@@ -1,6 +1,8 @@
 package client;
 
 import com.sun.org.apache.bcel.internal.classfile.Utility;
+import java.awt.Dimension;
+import java.awt.Toolkit;
 import server.Room;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -20,6 +22,10 @@ public class LoginWindow extends javax.swing.JFrame {
      */
     public LoginWindow() {
         initComponents();
+
+        // centralizar a janela
+        Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
+        this.setLocation(dim.width / 2 - this.getSize().width / 2, dim.height / 2 - this.getSize().height / 2);
     }
 
     /**
@@ -38,6 +44,7 @@ public class LoginWindow extends javax.swing.JFrame {
         jButton1 = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setTitle("Chat Redes 2");
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowActivated(java.awt.event.WindowEvent evt) {
                 formWindowActivated(evt);
@@ -101,10 +108,10 @@ public class LoginWindow extends javax.swing.JFrame {
     }//GEN-LAST:event_jTextField1ActionPerformed
 
     private void formWindowActivated(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowActivated
-        
+
         String ip = null;
         String port = null;
-        
+
         Properties props = new Properties();
         try {
             props.load(getClass().getResourceAsStream("/config/Chat.properties"));
@@ -133,19 +140,28 @@ public class LoginWindow extends javax.swing.JFrame {
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         // TODO add your handling code here:
-        ChatWindow window = new ChatWindow();
-        window.socket = this.serverSocket;
-        window.setVisible(true);
-        this.setVisible(false);
+        String nickname = jTextField1.getText();
+        
+        nickname = nickname.replaceAll("\\s", "");
+        
+        if (!(nickname.equals(""))
+                && !(nickname.equals("TODOS"))
+                && !(nickname.equals("todos"))
+                ) {
+            ChatWindow window = new ChatWindow();
+            window.socket = this.serverSocket;
+            window.setVisible(true);
+            this.setVisible(false);
 
-        ObjectOutputStream saida;
-        try {
-            saida = new ObjectOutputStream(serverSocket.getOutputStream());
-            saida.writeObject(this.jTextField1.getText());
-        } catch (IOException ex) {
-            Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
+            ObjectOutputStream saida;
+            try {
+                saida = new ObjectOutputStream(serverSocket.getOutputStream());
+                saida.writeObject(this.jTextField1.getText());
+            } catch (IOException ex) {
+                Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
         }
-
     }//GEN-LAST:event_jButton1ActionPerformed
 
     /**

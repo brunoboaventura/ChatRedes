@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+    <room>
+        <name>Redes 2</name>
+        <multicastIp>127.0.0.1</multicastIp>
+    </room>
+    <room>
+        <name>Sistemas Distribuídos</name>
+        <multicastIp>127.0.0.1</multicastIp>
+    </room>
+    <room>
+        <name>Programação Concorrente</name>
+        <multicastIp>127.0.0.1</multicastIp>
+    </room>
+</root>
