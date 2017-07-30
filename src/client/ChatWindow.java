@@ -8,12 +8,18 @@ import javax.swing.AbstractAction;
 import javax.swing.Action;
 
 public class ChatWindow extends javax.swing.JFrame {
-
+    
+    String nickname;
+    Socket tcpSocket;
+    
     /**
      * Creates new form ChatWindow
      */
-    public ChatWindow() {
+    public ChatWindow(String nickname, Socket tcpSocket) {
         initComponents();
+        
+        this.nickname = nickname;
+        this.tcpSocket = tcpSocket;
 
         // para fazer o <ENTER> no jTextField realizar o clique do botão Enviar
         Action action = new AbstractAction() {

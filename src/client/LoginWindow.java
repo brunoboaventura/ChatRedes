@@ -1,11 +1,9 @@
 package client;
 
-import com.sun.org.apache.bcel.internal.classfile.Utility;
+import general.Message;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import server.Room;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -17,6 +15,9 @@ import java.util.logging.Logger;
 
 public class LoginWindow extends javax.swing.JFrame {
 
+    private String ipServidor;
+    private int tcpPort;
+    private Socket tcpSocket = null;
     /**
      * Creates new form LoginJFrame
      */
@@ -26,6 +27,23 @@ public class LoginWindow extends javax.swing.JFrame {
         // centralizar a janela
         Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
         setLocation(dim.width / 2 - getSize().width / 2, dim.height / 2 - getSize().height / 2);
+
+        getConfig();
+    }
+
+    // pegar dados de configuração (Ip e porta TCP do servidor)
+    private void getConfig() {
+        Properties props = new Properties();
+        try {
+            props.load(getClass().getResourceAsStream("/config/Chat.properties"));
+
+            ipServidor = props.getProperty("chat.server.ip");
+            tcpPort = Integer.parseInt(props.getProperty("chat.port.tcp"));
+
+        } catch (IOException ex) {
+            Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
     }
 
     /**
@@ -77,11 +95,11 @@ public class LoginWindow extends javax.swing.JFrame {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jLabel1)
                     .addComponent(jLabel2))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 51, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 72, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                    .addComponent(jButton1, javax.swing.GroupLayout.DEFAULT_SIZE, 164, Short.MAX_VALUE)
-                    .addComponent(jComboBox1, javax.swing.GroupLayout.Alignment.LEADING, 0, 164, Short.MAX_VALUE)
-                    .addComponent(jTextField1, javax.swing.GroupLayout.Alignment.LEADING))
+                    .addComponent(jComboBox1, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(jTextField1)
+                    .addComponent(jButton1, javax.swing.GroupLayout.DEFAULT_SIZE, 210, Short.MAX_VALUE))
                 .addGap(30, 30, 30))
         );
         layout.setVerticalGroup(
@@ -109,28 +127,14 @@ public class LoginWindow extends javax.swing.JFrame {
 
     private void formWindowActivated(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowActivated
 
-        String ip = null;
-        String port = null;
-
-        Properties props = new Properties();
         try {
-            props.load(getClass().getResourceAsStream("/config/Chat.properties"));
+            tcpSocket = new Socket(ipServidor, tcpPort);
 
-            ip = props.getProperty("chat.server.ip");
-            port = props.getProperty("chat.port.tcp");
-
-        } catch (IOException ex) {
-            Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        try {
-            serverSocket = new Socket(ip, Integer.parseInt(port));
-
-            ObjectInputStream entrada = new ObjectInputStream(serverSocket.getInputStream());
+            ObjectInputStream entrada = new ObjectInputStream(tcpSocket.getInputStream());
             ArrayList salas = (ArrayList) entrada.readObject();
 
             for (int i = 0; i < salas.size(); i++) {
-                jComboBox1.addItem(((Room) salas.get(i)).getNome());
+                jComboBox1.addItem(((Room) salas.get(i)).getName());
             }
 
         } catch (IOException | ClassNotFoundException ex) {
@@ -141,26 +145,26 @@ public class LoginWindow extends javax.swing.JFrame {
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         // TODO add your handling code here:
         String nickname = jTextField1.getText();
-        
+
         nickname = nickname.replaceAll("\\s", "");
-        
+
         if (!(nickname.equals(""))
                 && !(nickname.equals("TODOS"))
-                && !(nickname.equals("todos"))
-                ) {
-            ChatWindow window = new ChatWindow();
-            window.socket = serverSocket;
+                && !(nickname.equals("todos"))) {
+
+            // formato da mensagem de conexao:
+            // CONNECT:usuario:sala
+            String msg = "CONNECT:"
+                    + jTextField1.getText()
+                    + ":"
+                    + jComboBox1.getSelectedItem().toString();
+
+            Message.sendStringTCP(tcpSocket, msg);
+
+            ChatWindow window = new ChatWindow(nickname, tcpSocket);
+            window.socket = tcpSocket;
             window.setVisible(true);
             setVisible(false);
-
-            ObjectOutputStream saida;
-            try {
-                saida = new ObjectOutputStream(serverSocket.getOutputStream());
-                saida.writeObject(jTextField1.getText());
-            } catch (IOException ex) {
-                Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
         }
     }//GEN-LAST:event_jButton1ActionPerformed
 
@@ -200,7 +204,6 @@ public class LoginWindow extends javax.swing.JFrame {
         });
     }
 
-    private Socket serverSocket = null;
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
     private javax.swing.JComboBox<String> jComboBox1;

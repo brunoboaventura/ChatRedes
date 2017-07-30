@@ -1,30 +1,62 @@
 package server;
 
 import java.io.Serializable;
+import java.net.InetAddress;
 import java.net.Socket;
 
 public class ClientData implements Serializable {
 
-    private final String nickname;
-    private final Socket socketTCP;
-    private final String ip;
+    private String nickname;
+    private Socket socketTCP;
+    private InetAddress inetAddress;
+    private String sala;
+    private String ipMulticast;
    
-    public ClientData (String n, Socket s, String ip) {
-        this.nickname = n;
-        this.socketTCP = s;
-        this.ip = ip;
+    public ClientData (String nickname, Socket socket, InetAddress inetAddress) {
+        this.nickname = nickname;
+        this.socketTCP = socket;
+        this.inetAddress = inetAddress;
     }
 
     public String getNickname() {
         return nickname;
     }
 
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
     public Socket getSocketTCP() {
         return socketTCP;
     }
 
-    public String getIp() {
-        return ip;
-    }    
+    public void setSocketTCP(Socket socketTCP) {
+        this.socketTCP = socketTCP;
+    }
+
+    public InetAddress getInetAddress() {
+        return inetAddress;
+    }
+
+    public void setInetAddress(InetAddress inetAddress) {
+        this.inetAddress = inetAddress;
+    }
+
+    public String getSala() {
+        return sala;
+    }
+
+    public void setSala(String sala) {
+        this.sala = sala;
+    }
+
+    public String getIpMulticast() {
+        return ipMulticast;
+    }
+
+    public void setIpMulticast(String ipMulticast) {
+        this.ipMulticast = ipMulticast;
+    }
+
     
 }

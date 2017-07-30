@@ -4,28 +4,28 @@ import java.io.Serializable;
 
 public class Room implements Serializable {
 
-    private String nome;
-    private String ip_multicast;
+    private String name;
+    private String ipMulticast;
 
-    public Room(String nome, String ip) {
-        this.nome = nome;
-        this.ip_multicast = ip;
+    public Room(String name, String ip) {
+        this.name = name;
+        this.ipMulticast = ip;
     }
 
-    public String getNome() {
-        return nome;
+    public String getName() {
+        return name;
     }
 
-    public void setNome(String nome) {
-        this.nome = nome;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public String getIp_multicast() {
-        return ip_multicast;
+    public String getIpMulticast() {
+        return ipMulticast;
     }
 
-    public void setIp_multicast(String ip_multicast) {
-        this.ip_multicast = ip_multicast;
+    public void setIpMulticast(String ipMulticast) {
+        this.ipMulticast = ipMulticast;
     }
 
 }

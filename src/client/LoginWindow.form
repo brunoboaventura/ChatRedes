@@ -33,11 +33,11 @@
                   <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
                   <Component id="jLabel2" alignment="0" min="-2" max="-2" attributes="0"/>
               </Group>
-              <EmptySpace pref="51" max="32767" attributes="0"/>
+              <EmptySpace pref="72" max="32767" attributes="0"/>
               <Group type="103" groupAlignment="1" max="-2" attributes="0">
-                  <Component id="jButton1" pref="164" max="32767" attributes="0"/>
-                  <Component id="jComboBox1" alignment="0" pref="164" max="32767" attributes="0"/>
-                  <Component id="jTextField1" alignment="0" max="32767" attributes="0"/>
+                  <Component id="jComboBox1" max="32767" attributes="0"/>
+                  <Component id="jTextField1" alignment="1" max="32767" attributes="0"/>
+                  <Component id="jButton1" alignment="1" pref="210" max="32767" attributes="0"/>
               </Group>
               <EmptySpace min="-2" pref="30" max="-2" attributes="0"/>
           </Group>
