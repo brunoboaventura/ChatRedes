@@ -26,7 +26,7 @@ public class ChatConfig {
 
     private ChatConfig() throws IOException {
         Properties props = new Properties();
-        props.load(getClass().getResourceAsStream("/config/Chat.properties"));
+        props.load(getClass().getResourceAsStream("Chat.properties"));
 
         serverIp = props.getProperty("chat.server.ip");
         tcpPort1 = Integer.parseInt(props.getProperty("chat.port.tcp1"));
@@ -35,7 +35,7 @@ public class ChatConfig {
         mcastPort = Integer.parseInt(props.getProperty("chat.port.mcast"));
         messageMaxLength = Integer.parseInt(props.getProperty("chat.message.max_length"));
 
-        XMLpath = getClass().getResource("/config/rooms.xml").getPath();
+        XMLpath = getClass().getResource("rooms.xml").getPath();
     }
 
     public static ChatConfig getInstance() throws IOException {
