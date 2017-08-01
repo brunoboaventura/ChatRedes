@@ -1,25 +1,73 @@
 package client;
 
+import config.ChatConfig;
+import general.General;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.File;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.MulticastSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
+import javax.swing.DefaultListModel;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 public class ChatWindow extends javax.swing.JFrame {
-    
-    String nickname;
-    Socket tcpSocket;
-    
+
+    private Socket tcpSocket;
+    private MulticastSocket mcastSocket;
+
+    private int udpPort = 0;
+
+    private final String nickname;
+    private final String roomName;
+    private final String multicastIp;
+
+    private DefaultListModel model = new DefaultListModel();
+    private String lastUserList = "";
+
     /**
      * Creates new form ChatWindow
      */
-    public ChatWindow(String nickname, Socket tcpSocket) {
+    public ChatWindow(String nickname,
+            Socket tcpSocket,
+            String roomName,
+            String multicastIp,
+            int udpPort)
+            throws
+            ParserConfigurationException, SAXException, IOException {
         initComponents();
-        
+
         this.nickname = nickname;
         this.tcpSocket = tcpSocket;
+        this.roomName = roomName;
+        this.multicastIp = multicastIp;
+        this.udpPort = udpPort;
+
+        jLabel1.setText(nickname);
+        jLabel2.setText(roomName);
+
+        model.clear();
+        model.addElement("TODOS");
+        jList1.setModel(model);
+        jList1.setSelectedValue("TODOS", false);
+
+        jTextField1.requestFocus();
 
         // para fazer o <ENTER> no jTextField realizar o clique do botão Enviar
         Action action = new AbstractAction() {
@@ -34,6 +82,120 @@ public class ChatWindow extends javax.swing.JFrame {
         // centralizar a janela
         Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
         setLocation(dim.width / 2 - getSize().width / 2, dim.height / 2 - getSize().height / 2);
+
+        // mudar o comportamento do botao de fechar a janela
+        addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent we) {
+                setVisible(false);
+
+                try {
+                    General.sendStringTCP(
+                            ChatConfig.getServerIp(),
+                            ChatConfig.getTcpPort2(), "DISCONNECT:" + nickname + ":");
+                } catch (IOException ex) {
+                    Logger.getLogger(ChatWindow.class.getName()).log(Level.SEVERE, null, ex);
+                }
+
+                dispose();
+
+                System.exit(0);
+            }
+        });
+
+        Runnable mcastListener;
+        mcastListener = () -> {
+            try {
+                while (true) {
+
+                    mcastSocket = new MulticastSocket(ChatConfig.getMcastPort());
+                    mcastSocket.joinGroup(InetAddress.getByName(multicastIp));
+
+                    byte[] buffer = new byte[ChatConfig.getMessageMaxLength()];
+
+                    DatagramPacket rec = new DatagramPacket(buffer, buffer.length);
+
+                    mcastSocket.setSoTimeout(500000);
+                    mcastSocket.receive(rec);
+
+                    String msg = new String(rec.getData());
+
+                    mcastSocket.close();
+                    
+                    if (msg.startsWith("LISTA:")) {
+                        updateUserList(msg);
+                    } else {
+                        updateMessageArea(msg);
+                    }
+
+                }
+
+            } catch (IOException ex) {
+                Logger.getLogger(ChatWindow.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+        };
+
+        Thread threadMcastListener = new Thread(mcastListener);
+        threadMcastListener.start();
+
+        Runnable udpReceiver;
+        udpReceiver = () -> {
+            while (true) {
+                try {
+                    // o socket UDP ficará aguardando os mensagens:
+                    // NICKNAME_DESTINO:NICKNAME_ORIGEM:TEXTO
+
+                    DatagramSocket socketUDP;
+                    if (getUdpPort() == 0) {
+                        socketUDP = new DatagramSocket();
+                        System.out.println(socketUDP.getLocalPort());
+
+                        this.setUdpPort(socketUDP.getLocalPort());
+
+                        String command = "UDP-PORT:"
+                                + nickname
+                                + ":"
+                                + String.valueOf(getUdpPort())
+                                + ":";
+
+                        General.sendStringTCP(
+                                ChatConfig.getServerIp(),
+                                ChatConfig.getTcpPort2(),
+                                command);
+                    } else {
+                        socketUDP = new DatagramSocket(getUdpPort());
+                    }
+                    byte[] receiveData = new byte[ChatConfig.getMessageMaxLength()];
+
+                    DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+
+                    socketUDP.receive(receivePacket);
+
+                    String msg = new String(receivePacket.getData());
+
+                    updateMessageArea(msg);
+
+                    socketUDP.close();
+                } catch (SocketException ex) {
+                    Logger.getLogger(ChatWindow.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(ChatWindow.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+
+        };
+
+        Thread threadUdpReceiver = new Thread(udpReceiver);
+        threadUdpReceiver.start();
+
+    }
+
+    public int getUdpPort() {
+        return udpPort;
+    }
+
+    public void setUdpPort(int udpPort) {
+        this.udpPort = udpPort;
     }
 
     /**
@@ -53,23 +215,32 @@ public class ChatWindow extends javax.swing.JFrame {
         jTextField1 = new javax.swing.JTextField();
         jButton1 = new javax.swing.JButton();
         jButton2 = new javax.swing.JButton();
+        jLabel1 = new javax.swing.JLabel();
+        jLabel2 = new javax.swing.JLabel();
 
-        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
 
+        jList1.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         jScrollPane1.setViewportView(jList1);
 
+        jTextArea1.setEditable(false);
         jTextArea1.setColumns(20);
         jTextArea1.setRows(5);
+        jTextArea1.setDragEnabled(true);
         jScrollPane2.setViewportView(jTextArea1);
 
-        jButton1.setText("Enviar");
+        jButton1.setText("Send");
         jButton1.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 jButton1ActionPerformed(evt);
             }
         });
 
-        jButton2.setText("Enviar Arquivo");
+        jButton2.setText("Send File");
+
+        jLabel1.setText("jLabel1");
+
+        jLabel2.setText("jLabel2");
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -82,17 +253,26 @@ public class ChatWindow extends javax.swing.JFrame {
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, 394, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(30, 30, 30)
-                        .addComponent(jButton1, javax.swing.GroupLayout.DEFAULT_SIZE, 117, Short.MAX_VALUE)))
+                        .addComponent(jButton1, javax.swing.GroupLayout.DEFAULT_SIZE, 117, Short.MAX_VALUE))
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(jLabel2)
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addGap(18, 18, 18)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 164, Short.MAX_VALUE)
-                    .addComponent(jButton2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jLabel1)
+                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 164, Short.MAX_VALUE)
+                        .addComponent(jButton2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
                 .addGap(30, 30, 30))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(30, 30, 30)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel1)
+                    .addComponent(jLabel2))
+                .addGap(18, 18, 18)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addComponent(jScrollPane1)
                     .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 290, Short.MAX_VALUE))
@@ -102,21 +282,72 @@ public class ChatWindow extends javax.swing.JFrame {
                     .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                         .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 37, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(30, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        // TODO add your handling code here:
+
+        if (!jTextField1.getText().equals("")) {
+
+            String msg = nickname.toUpperCase() + ": " + jTextField1.getText();
+
+            if (jList1.getSelectedValue().equals("TODOS")) {
+                General.sendStringMulticast(multicastIp, msg);
+            } else {
+                General.sendStringToUDPServer(jList1.getSelectedValue() + ":" + msg);
+            }
+
+            jTextField1.setText("");
+            jTextField1.requestFocus();
+        }
     }//GEN-LAST:event_jButton1ActionPerformed
 
-    public Socket socket;
+    private void updateUserList(String userList) {
+
+        String[] split;
+        String selectedValue = null;
+
+        if (!(lastUserList.equals(userList))) {
+
+            selectedValue = jList1.getSelectedValue();
+
+            lastUserList = userList;
+
+            split = userList.split(":");
+
+            if (split.length > 2) {
+                model.clear();
+                model.addElement("TODOS");
+
+                for (int i = 3; i < split.length; i++) {
+                    model.addElement(split[i]);
+                }
+
+                split = null;
+
+                jList1.setModel(model);
+            }
+        }
+
+        jList1.setSelectedValue(selectedValue, false);
+    }
+
+    private void updateMessageArea(String msg) {
+
+        jTextArea1.setText(jTextArea1.getText() + "\n" + msg);
+        jTextArea1.repaint();
+        jTextArea1.setCaretPosition(jTextArea1.getDocument().getLength());
+    }
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;
     private javax.swing.JFileChooser jFileChooser1;
+    private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel jLabel2;
     private javax.swing.JList<String> jList1;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;

@@ -1,6 +1,7 @@
 package server;
 
-import java.io.File;
+import config.ChatConfig;
+import general.General;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -13,35 +14,19 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Properties;
-import java.util.Stack;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import org.w3c.dom.Document;
-import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 public class Server {
 
-    // portas do chat (serão lidas do Chat.properties)
-    private static int tcpPort;
-    private static int udpPort;
-    private static int mcastPort;
-
-    private static int messageMaxLength;
-
     // socket TCP principal, onde o cliente se conecta
-    // por esse socket o cliente receberá as salas disponíveis e
-    // enviará os pedidos TCP:
-    private ServerSocket socketTCP;
+    // por esse socket o cliente receberá as salas disponíveis
+    private ServerSocket socketTCP1;
 
-    // socket UDP que receberá as mensagens e fará o enfileiramento,
-    // será usado em seguida para enviar as mensagens enfileiradas
-    private DatagramSocket socketUDP;
+    private ServerSocket socketTCP2;
 
     // fila (FIFO) para as mensagens (thread safe)
     private final ConcurrentLinkedQueue fifo = new ConcurrentLinkedQueue();
@@ -50,62 +35,20 @@ public class Server {
     private final ArrayList<ClientData> clients = new ArrayList();
 
     // lista de salas com os endereços multicast de cada uma
-    private ArrayList<Room> rooms = new ArrayList();
+    private ArrayList<Room> rooms = null;
 
-    public Server() throws IOException, ParserConfigurationException, SAXException {
-        setPorts();
-        setRooms();
-        setConfig();
+    ChatConfig config = ChatConfig.getInstance();
+
+    public Server() throws ParserConfigurationException, SAXException, IOException {
+
+        rooms = ChatConfig.getRooms();
 
         // criando os sockets
-        socketTCP = new ServerSocket(tcpPort);
-        socketUDP = new DatagramSocket(udpPort);
+        socketTCP1 = new ServerSocket(ChatConfig.getTcpPort1());
+        socketTCP2 = new ServerSocket(ChatConfig.getTcpPort2());
 
-        // executando o loop principal, que vai escutar a porta TCP e devolver
-        // a lista de salas para o usuário, bem como criar as threads para o
-        // tratamento das mensagens (conexao e desconexao) e envio de arquivos
+        // função que cria as threads que tratarão as conexões
         mainLoop();
-
-    }
-
-    // ler as salas do arquivo rooms.xml
-    private void setRooms() throws ParserConfigurationException, SAXException, IOException {
-
-        NodeList nodeList;
-
-        File fXmlFile = new File(getClass().getResource("/config/rooms.xml").getPath());
-        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-        Document doc = dBuilder.parse(fXmlFile);
-
-        nodeList = doc.getElementsByTagName("room");
-
-        System.out.println(getClass().getResource("/config/rooms.xml").getPath());
-
-        for (int i = 0; i < nodeList.getLength(); i++) {
-            String room = nodeList.item(i).getChildNodes().item(1).getTextContent();
-            String ip = nodeList.item(i).getChildNodes().item(2).getTextContent();
-
-            rooms.add(new Room(room, ip));
-        }
-    }
-
-    // funcao para ler as portas do arquivo Chat.properties
-    private void setPorts() throws IOException {
-        Properties props = new Properties();
-        props.load(getClass().getResourceAsStream("/config/Chat.properties"));
-
-        tcpPort = Integer.parseInt(props.getProperty("chat.port.tcp"));
-        udpPort = Integer.parseInt(props.getProperty("chat.port.udp"));
-        mcastPort = Integer.parseInt(props.getProperty("chat.port.mcast"));
-    }
-
-    // funcao para ler outras configurações do arquivo Chat.properties
-    private void setConfig() throws IOException {
-        Properties props = new Properties();
-        props.load(getClass().getResourceAsStream("/config/Chat.properties"));
-
-        messageMaxLength = Integer.parseInt(props.getProperty("chat.message.max_length"));
     }
 
     private InetAddress getInetAddressFromNickname(String nickname) {
@@ -119,210 +62,288 @@ public class Server {
             }
         }
 
+        System.out.println(cli.getInetAddress().getHostAddress());
         return cli.getInetAddress();
     }
 
     private void mainLoop() throws IOException {
 
-                    // thread que vai receber todos os datagramas enviados pelos clientes
-            Runnable udpReceiver;
-            udpReceiver = () -> {
-                System.out.println("UDP receiver OK.");
+        // thread que vai receber todos os datagramas enviados pelos clientes
+        Runnable udpReceiver;
+        udpReceiver = () -> {
+            System.out.println("Receiver UDP iniciado.");
 
-                while (true) {
+            while (true) {
+                try {
+
                     // o socket UDP ficará aguardando os mensagens:
                     // MESSAGE:NICKNAME_DESTINO:NICKNAME_ORIGEM:TEXTO
-                    byte[] receiveData = new byte[messageMaxLength];
+                    DatagramSocket socketUDP = new DatagramSocket(ChatConfig.getUdpPort());
+
+                    byte[] receiveData = new byte[ChatConfig.getMessageMaxLength()];
                     DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+                    socketUDP.receive(receivePacket);
+
+                    String msg = new String(receivePacket.getData());
+
+                    fifo.add(msg);
+
+                    socketUDP.close();
+
+                } catch (IOException ex) {
+                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+
+        };
+
+        Thread threadUdpReceiver = new Thread(udpReceiver);
+        threadUdpReceiver.start();
+
+        // thread que vai enviar as mensagens para os clientes.
+        Runnable udpSender;
+        udpSender = () -> {
+            System.out.println("Sender UDP iniciado.");
+            while (true) {
+                // verifica se existem mensagens na fila e as envia
+                if (!fifo.isEmpty()) {
                     try {
-                        socketUDP.receive(receivePacket);
+                        DatagramSocket socketUDP = new DatagramSocket();
 
-                        String sentence = new String(receivePacket.getData());
+                        byte[] sendData = new byte[ChatConfig.getMessageMaxLength()];
+                        String msg = (String) fifo.poll();
 
-                        System.out.println("RECEIVED: " + sentence);
+                        String[] split = msg.split(":");
 
-                        fifo.add(sentence);
+                        int clientUdpPort = 0;
+                        InetAddress inetAddress = null;
 
+                        for (ClientData c : clients) {
+                            if (c.getNickname().equals(split[0])) {
+                                clientUdpPort = c.getUpdPort();
+                                inetAddress = c.getInetAddress();
+                            }
+                        }
+                        
+                        msg = split[1] + ":" + split[2];
+                        sendData = msg.getBytes();
+
+                        DatagramPacket sendPacket
+                                = new DatagramPacket(
+                                        sendData,
+                                        sendData.length,
+                                        inetAddress,
+                                        clientUdpPort);
+
+                        socketUDP.send(sendPacket);
+
+                        socketUDP.close();
+                    } catch (IOException ex) {
+                        Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
+
+        };
+
+        Thread threadUdpSender = new Thread(udpSender);
+        threadUdpSender.start();
+
+        // thread que vai atualizar a lista de usuarios das salas
+        // padrão das mensagens:
+        // LIST:SALA:USUARIO1:USUARIO2:...
+        Runnable multicastServer;
+        multicastServer = () -> {
+            System.out.println("Servidor Multicast iniciado.");
+
+            String list;
+            ArrayList<String> lists = new ArrayList();
+
+            while (true) {
+                for (int i = 0; i < rooms.size(); i++) {
+                    Room room = rooms.get(i);
+
+                    list = "LISTA:"
+                            + room.getName()
+                            + ":"
+                            + room.getIpMulticast()
+                            + ":";
+
+                    if (clients.size() > 0) {
+                        for (int j = 0; j < clients.size(); j++) {
+                            ClientData cli = clients.get(j);
+                            if (room.getName().equals(cli.getSala())) {
+                                list += cli.getNickname() + ":";
+                            }
+                        }
+                    }
+                    //System.out.println(list);
+                    lists.add(list);
+                }
+
+                InetAddress inetAddress;
+                MulticastSocket socketMulticast;
+                DatagramPacket dtgrm;
+
+                for (int i = 0; i < lists.size(); i++) {
+                    String[] split = lists.get(i).split(":");
+                    try {
+                        inetAddress = InetAddress.getByName(split[2]);
+
+                        socketMulticast = new MulticastSocket(ChatConfig.getMcastPort());
+                        socketMulticast.joinGroup(inetAddress);
+
+                        dtgrm = new DatagramPacket(
+                                lists.get(i).getBytes(),
+                                lists.get(i).length(),
+                                inetAddress,
+                                ChatConfig.getMcastPort());
+
+                        socketMulticast.send(dtgrm);
+
+                    } catch (UnknownHostException ex) {
+                        Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                     } catch (IOException ex) {
                         Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
 
-            };
-
-            Thread threadUdpReceiver = new Thread(udpReceiver);
-            threadUdpReceiver.start();
-
-            // thread que vai enviar as mensagens para os clientes.
-            Runnable udpSender;
-            udpSender = () -> {
-                System.out.println("UDP Sender OK.");
-                while (true) {
-                    // verifica se existem mensagens na fila e as envia
-                    if (!fifo.isEmpty()) {
-                        try {
-                            byte[] sendData = new byte[messageMaxLength];
-                            String message = (String) fifo.poll();
-                            String[] split = message.split(":");
-
-                            InetAddress inetAddress = getInetAddressFromNickname(split[1]);
-
-                            sendData = message.getBytes();
-
-                            DatagramPacket sendPacket
-                                    = new DatagramPacket(sendData, sendData.length, inetAddress, udpPort);
-
-                            socketUDP.send(sendPacket);
-                        } catch (IOException ex) {
-                            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                    }
-                }
-
-            };
-
-            Thread threadUdpSender = new Thread(udpSender);
-            threadUdpSender.start();
-
-            // thread que vai atualizar a lista de usuarios das salas
-            // padrão das mensagens:
-            // LIST:SALA:USUARIO1:USUARIO2:...
-            Runnable multicastServer;
-            multicastServer = () -> {
-                System.out.println("Multicast server OK.");
-
-                String list;
-                ArrayList<String> lists = new ArrayList();
-
-                while (true) {
-                    for (int i = 0; i < rooms.size(); i++) {
-                        Room room = rooms.get(i);
-
-                        list = "LISTA:"
-                                + room.getName()
-                                + ":";
-
-                        if (clients.size() > 0) {
-                            for (int j = 0; j < clients.size(); j++) {
-                                ClientData cli = clients.get(j);
-                                if (room.getName().equals(cli.getSala())) {
-                                    list += cli.getNickname() + ":";
-                                }
-                            }
-                        }
-                        System.out.println(list);
-                        lists.add(list);
-                    }
-
-//                InetAddress inetAddress;
-//                MulticastSocket socketMulticast;
-//                DatagramPacket dtgrm;
-//
-//                for (int i = 0; i < lists.size(); i++) {
-//                    String[] split = lists.get(i).split(":");
-//                    try {
-//                        System.out.println(InetAddress.getAllByName(split[2]).toString());
-//                        inetAddress = InetAddress.getByName(split[2]);
-//                        socketMulticast = new MulticastSocket(mcastPort);
-//                        socketMulticast.joinGroup(inetAddress);
-//                        dtgrm = new DatagramPacket(lists.get(i).getBytes(), lists.get(i).length(), inetAddress, mcastPort);
-//                        socketMulticast.send(dtgrm);
-//
-//                    } catch (UnknownHostException ex) {
-//                        Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-//                    } catch (IOException ex) {
-//                        Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-//                    }
-//                }
-//
                 try {
                     Thread.sleep(3000);
                 } catch (InterruptedException ex) {
                     Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                    lists.clear();
-                }
-            };
+                lists.clear();
+            }
+        };
 
-            Thread threadMulticastServer = new Thread(multicastServer);
-            threadMulticastServer.start();
+        Thread threadMulticastServer = new Thread(multicastServer);
+        threadMulticastServer.start();
 
-        
+        // ao aceitar uma conexão, o servidor cria uma thread que vai
+        // enviar a lista de salas e depois fechar a conexão
+        Runnable sendRooms;
+        sendRooms = () -> {
+            while (true) {
+                Socket clientSocket = null;
 
-        while (true) {
-            Socket clientSocket = socketTCP.accept();
-
-            // ao aceitar uma conexão, o servidor cria uma thread que vai
-            // enviar a lista de salas
-            Runnable sendRooms;
-            sendRooms = () -> {
-                ObjectOutputStream outputStream;
                 try {
-                    outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
-                    outputStream.flush();
-                    outputStream.writeObject(rooms);
+                    clientSocket = socketTCP1.accept();
+
+                    if (clientSocket.isConnected()) {
+
+                        try {
+                            ObjectOutputStream outputStream;
+                            outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
+                            outputStream.flush();
+                            outputStream.writeObject(rooms);
+
+                            outputStream.close();
+                        } catch (IOException ex) {
+                            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                } catch (IOException ex) {
+                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        };
+
+        Thread tSendRooms = new Thread(sendRooms);
+        tSendRooms.start();
+
+        // thread que escuta o socket TCP que será usado para receber os
+        // comandos e transferir arquivos (ou não - talvez um só pra isso)
+        Runnable tcpServer;
+        tcpServer = () -> {
+            System.out.println("Servidor TCP inciado.");
+
+            String command = null;
+            ObjectInputStream inputStream = null;
+            String[] split = null;
+
+            while (true) {
+                // o socket TCP ficará aguardando os comandos via string:
+                // CONNECT:NICKNAME:SALA - compando para conectar o chat
+                // DISCONNECT:NICKNAME - desconectar todos os sockets
+                // FILE:
+                Socket clientSocket = null;
+
+                try {
+                    clientSocket = socketTCP2.accept();
                 } catch (IOException ex) {
                     Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                 }
 
-            };
+                command = null;
+                if (clientSocket.isConnected() || !clientSocket.isClosed()) {
 
-            Thread tSendRooms = new Thread(sendRooms);
-            tSendRooms.start();
-
-            // thread que escuta o socket TCP que será usado para receber os
-            // comandos e transferir arquivos (ou não - talvez um só pra isso)
-            Runnable tcpServer;
-            tcpServer = () -> {
-                System.out.println("TCP server OK.");
-
-                while (true) {
-                    // o socket TCP ficará aguardando os comandos via string:
-                    // CONNECT:NICKNAME:SALA - compando para conectar o chat
-                    // DISCONNECT:NICKNAME - desconectar todos os sockets
-                    // FILE:
-                    
-                    if (clientSocket.isClosed())
-                        break;
-
-                    ObjectInputStream inputStream = null;
                     try {
                         inputStream = new ObjectInputStream(clientSocket.getInputStream());
-                        String command = (String) inputStream.readObject();
-
-                        if (command.startsWith("CONNECT:")) {
-                            String[] split = command.split(":");
-
-                            ClientData cli = new ClientData(
-                                    split[1],
-                                    clientSocket,
-                                    clientSocket.getInetAddress()
-                            );
-
-                            cli.setSala(split[2]);
-
-                            for (int i = 0; i < rooms.size(); i++) {
-                                Room room = rooms.get(i);
-                                if (room.getName().equals(split[2])) {
-                                    cli.setIpMulticast(room.getIpMulticast());
-                                }
-                            }
-
-                            clients.add(cli);
-
-                        }
-
-                        System.out.println(command);
-
+                        command = (String) inputStream.readObject();
                     } catch (IOException | ClassNotFoundException ex) {
                         Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                     }
-                }
-            };
 
-            Thread threadTcpServer = new Thread(tcpServer);
-            threadTcpServer.start();
-        }
+                    if ((command != null) && command.startsWith("CONNECT:")) {
+
+                        split = command.split(":");
+
+                        ClientData cli = new ClientData(
+                                split[1],
+                                clientSocket,
+                                clientSocket.getInetAddress()
+                        );
+
+                        cli.setSala(split[2]);
+
+                        for (Room room : rooms) {
+                            if (room.getName().equals(split[2])) {
+                                cli.setIpMulticast(room.getIpMulticast());
+                            }
+                        }
+
+                        clients.add(cli);
+                    }
+
+                    if ((command != null) && command.startsWith("DISCONNECT:")) {
+                        String nickname = command.split(":")[1];
+
+                        for (ClientData client : clients) {
+
+                            if (client.getNickname().equals(nickname)) {
+                                try {
+                                    client.getSocketTCP().close();
+                                    inputStream.close();
+                                    clients.remove(client);
+                                    break;
+                                } catch (IOException ex) {
+                                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+
+                            }
+                        }
+
+                    }
+
+                    if ((command != null) && command.startsWith("UDP-PORT:")) {
+                        split = command.split(":");
+
+                        for (ClientData client : clients) {
+                            if (client.getNickname().equals(split[1])) {
+                                client.setUpdPort(Integer.parseInt(split[2]));
+                                break;
+                            }
+                        }
+                    }
+
+                    System.out.println(command);
+                }
+            }
+        };
+
+        Thread threadTcpServer = new Thread(tcpServer);
+        threadTcpServer.start();
     }
 
     public static void main(String argv[]) throws Exception {

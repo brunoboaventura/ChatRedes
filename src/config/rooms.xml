@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rooms>
-    <room>
-        <name>Redes 2</name>
-        <multicastIp>224.225.226.227</multicastIp>
-    </room>
-    <room>
-        <name>Sistemas Distribuídos</name>
-        <multicastIp>224.225.226.228</multicastIp>
-    </room>
-    <room>
-        <name>Programação Concorrente</name>
-        <multicastIp>224.225.226.229</multicastIp>
-    </room>
+    <room name="Redes 2" multicastIp="224.225.226.227"/>
+    <room name="Sistemas Distribuídos" multicastIp="224.225.226.228"/>
+    <room name="Programação Concorrente" multicastIp="224.225.226.229"/>
 </rooms>

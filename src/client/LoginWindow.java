@@ -1,49 +1,39 @@
 package client;
 
-import general.Message;
+import config.ChatConfig;
+import general.General;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import server.Room;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.xml.parsers.ParserConfigurationException;
+import org.xml.sax.SAXException;
 
 public class LoginWindow extends javax.swing.JFrame {
 
-    private String ipServidor;
-    private int tcpPort;
-    private Socket tcpSocket = null;
+    private Socket tcpSocket1 = null;
+    private Socket tcpSocket2 = null;
+
+    private int udpPort;
+
+    private ArrayList<Room> rooms;
+
     /**
      * Creates new form LoginJFrame
      */
-    public LoginWindow() {
+    public LoginWindow() throws IOException {
         initComponents();
+
+        ChatConfig config = ChatConfig.getInstance();
 
         // centralizar a janela
         Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
         setLocation(dim.width / 2 - getSize().width / 2, dim.height / 2 - getSize().height / 2);
-
-        getConfig();
-    }
-
-    // pegar dados de configuração (Ip e porta TCP do servidor)
-    private void getConfig() {
-        Properties props = new Properties();
-        try {
-            props.load(getClass().getResourceAsStream("/config/Chat.properties"));
-
-            ipServidor = props.getProperty("chat.server.ip");
-            tcpPort = Integer.parseInt(props.getProperty("chat.port.tcp"));
-
-        } catch (IOException ex) {
-            Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
     }
 
     /**
@@ -69,17 +59,17 @@ public class LoginWindow extends javax.swing.JFrame {
             }
         });
 
-        jLabel1.setText("Sala:");
+        jLabel1.setText("Room:");
 
         jLabel2.setText("Nickname:");
 
-        jTextField1.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jTextField1ActionPerformed(evt);
+        jTextField1.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                jTextField1KeyReleased(evt);
             }
         });
 
-        jButton1.setText("Conectar");
+        jButton1.setText("Connect");
         jButton1.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 jButton1ActionPerformed(evt);
@@ -121,25 +111,24 @@ public class LoginWindow extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_jTextField1ActionPerformed
-
     private void formWindowActivated(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowActivated
 
         try {
-            tcpSocket = new Socket(ipServidor, tcpPort);
+            tcpSocket1 = new Socket(ChatConfig.getServerIp(), ChatConfig.getTcpPort1());
 
-            ObjectInputStream entrada = new ObjectInputStream(tcpSocket.getInputStream());
-            ArrayList salas = (ArrayList) entrada.readObject();
+            ObjectInputStream inputStream = new ObjectInputStream(tcpSocket1.getInputStream());
+            rooms = (ArrayList) inputStream.readObject();
 
-            for (int i = 0; i < salas.size(); i++) {
-                jComboBox1.addItem(((Room) salas.get(i)).getName());
+            for (Room room : rooms) {
+                jComboBox1.addItem(room.getName());
             }
-
+            
+            inputStream.close();
+            tcpSocket1.close();
         } catch (IOException | ClassNotFoundException ex) {
             Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
         }
+        
     }//GEN-LAST:event_formWindowActivated
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
@@ -157,52 +146,46 @@ public class LoginWindow extends javax.swing.JFrame {
             String msg = "CONNECT:"
                     + jTextField1.getText()
                     + ":"
-                    + jComboBox1.getSelectedItem().toString();
+                    + jComboBox1.getSelectedItem().toString()
+                    + ":";
 
-            Message.sendStringTCP(tcpSocket, msg);
+            try {
+                General.sendStringTCP(ChatConfig.getServerIp(), ChatConfig.getTcpPort2(), msg);
+            } catch (IOException ex) {
+                Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
+            }
 
-            ChatWindow window = new ChatWindow(nickname, tcpSocket);
-            window.socket = tcpSocket;
-            window.setVisible(true);
+            ChatWindow window;
+            try {
+
+                String roomName = jComboBox1.getSelectedItem().toString();
+                String multicastIp = null;
+
+                for (Room room : rooms) {
+                    if (room.getName().equals(roomName)) {
+                        multicastIp = room.getIpMulticast();
+                    }
+                }
+
+                window = new ChatWindow(
+                        nickname,
+                        tcpSocket2,
+                        roomName,
+                        multicastIp,
+                        udpPort);
+
+                window.setVisible(true);
+            } catch (ParserConfigurationException | SAXException | IOException ex) {
+                Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
             setVisible(false);
         }
     }//GEN-LAST:event_jButton1ActionPerformed
 
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(LoginWindow.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(LoginWindow.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(LoginWindow.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(LoginWindow.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        }
-        //</editor-fold>
-        //</editor-fold>
-
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new LoginWindow().setVisible(true);
-            }
-        });
-    }
+    private void jTextField1KeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_jTextField1KeyReleased
+        jTextField1.setText(jTextField1.getText().toUpperCase());
+    }//GEN-LAST:event_jTextField1KeyReleased
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
