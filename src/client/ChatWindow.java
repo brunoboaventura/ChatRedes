@@ -63,6 +63,11 @@ public class ChatWindow extends javax.swing.JFrame {
         jLabel2.setText(roomName);
 
         jTextField1.requestFocus();
+        
+        model.clear();
+        model.addElement("TODOS");
+        jList1.setModel(model);
+        jList1.setSelectedValue("TODOS", false);
 
         // para fazer o <ENTER> no jTextField realizar o clique do botão Enviar
         Action action = new AbstractAction() {
@@ -219,6 +224,11 @@ public class ChatWindow extends javax.swing.JFrame {
         setSize(new java.awt.Dimension(783, 445));
 
         jList1.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        jList1.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                jList1MouseClicked(evt);
+            }
+        });
         jScrollPane1.setViewportView(jList1);
 
         jTextArea1.setEditable(false);
@@ -296,12 +306,18 @@ public class ChatWindow extends javax.swing.JFrame {
                 General.sendStringMulticast(multicastIp, msg);
             } else {
                 General.sendStringToUDPServer(jList1.getSelectedValue() + ":" + msg);
+                updateMessageArea (msg);
             }
 
             jTextField1.setText("");
             jTextField1.requestFocus();
         }
     }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jList1MouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jList1MouseClicked
+        // TODO add your handling code here:
+        jTextField1.requestFocus();
+    }//GEN-LAST:event_jList1MouseClicked
 
     private void updateUserList(String userList) {
 
@@ -319,7 +335,7 @@ public class ChatWindow extends javax.swing.JFrame {
 
             model.addElement("TODOS");
 
-            for (int i = 3; i < split.length; i++) {
+            for (int i = 3; i < (split.length - 1); i++) {
                 if (!split[i].equals(nickname)) {
                     model.addElement(split[i]);
                 }

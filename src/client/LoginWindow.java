@@ -64,8 +64,8 @@ public class LoginWindow extends javax.swing.JFrame {
         jLabel2.setText("Nickname:");
 
         jTextField1.addKeyListener(new java.awt.event.KeyAdapter() {
-            public void keyReleased(java.awt.event.KeyEvent evt) {
-                jTextField1KeyReleased(evt);
+            public void keyTyped(java.awt.event.KeyEvent evt) {
+                jTextField1KeyTyped(evt);
             }
         });
 
@@ -122,13 +122,13 @@ public class LoginWindow extends javax.swing.JFrame {
             for (Room room : rooms) {
                 jComboBox1.addItem(room.getName());
             }
-            
+
             inputStream.close();
             tcpSocket1.close();
         } catch (IOException | ClassNotFoundException ex) {
             Logger.getLogger(LoginWindow.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
+
     }//GEN-LAST:event_formWindowActivated
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
@@ -183,9 +183,15 @@ public class LoginWindow extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_jButton1ActionPerformed
 
-    private void jTextField1KeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_jTextField1KeyReleased
-        jTextField1.setText(jTextField1.getText().toUpperCase());
-    }//GEN-LAST:event_jTextField1KeyReleased
+    private void jTextField1KeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_jTextField1KeyTyped
+        
+        if (Character.isLetterOrDigit(evt.getKeyChar())) {
+            jTextField1.setText(jTextField1.getText().toUpperCase());
+        } else {
+            evt.consume();
+        }
+        
+    }//GEN-LAST:event_jTextField1KeyTyped
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
