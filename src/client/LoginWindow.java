@@ -67,6 +67,9 @@ public class LoginWindow extends javax.swing.JFrame {
             public void keyTyped(java.awt.event.KeyEvent evt) {
                 jTextField1KeyTyped(evt);
             }
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                jTextField1KeyReleased(evt);
+            }
         });
 
         jButton1.setText("Connect");
@@ -184,14 +187,16 @@ public class LoginWindow extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jTextField1KeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_jTextField1KeyTyped
-        
-        if (Character.isLetterOrDigit(evt.getKeyChar())) {
-            jTextField1.setText(jTextField1.getText().toUpperCase());
-        } else {
+
+        if (!Character.isLetterOrDigit(evt.getKeyChar())) {
             evt.consume();
         }
-        
+
     }//GEN-LAST:event_jTextField1KeyTyped
+
+    private void jTextField1KeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_jTextField1KeyReleased
+        jTextField1.setText(jTextField1.getText().toUpperCase());
+    }//GEN-LAST:event_jTextField1KeyReleased
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;

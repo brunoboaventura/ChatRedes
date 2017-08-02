@@ -71,7 +71,7 @@ public class General {
             socketMulticast.joinGroup(inetAddress);
 
             dtgrm = new DatagramPacket(
-                    msg.getBytes(),
+                    msg.getBytes("UTF-8"),
                     msg.length(),
                     inetAddress,
                     ChatConfig.getMcastPort());
@@ -91,7 +91,7 @@ public class General {
             DatagramSocket socketUDP = new DatagramSocket();
             byte[] sendData = new byte[ChatConfig.getMessageMaxLength()];
             
-            sendData = msg.getBytes();
+            sendData = msg.getBytes("UTF-8");
 
             DatagramPacket sendPacket
                     = new DatagramPacket(

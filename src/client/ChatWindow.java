@@ -122,7 +122,6 @@ public class ChatWindow extends javax.swing.JFrame {
                     mcastSocket.close();
 
                     if (msg.startsWith("LISTA:")) {
-                        System.out.println(msg);
                         updateUserList(msg);
                     } else {
                         updateMessageArea(msg);
@@ -149,7 +148,6 @@ public class ChatWindow extends javax.swing.JFrame {
                     DatagramSocket socketUDP;
                     if (getUdpPort() == 0) {
                         socketUDP = new DatagramSocket();
-                        System.out.println(socketUDP.getLocalPort());
 
                         this.setUdpPort(socketUDP.getLocalPort());
 

@@ -126,7 +126,7 @@ public class Server {
                         }
 
                         msg = split[1] + ":" + split[2];
-                        sendData = msg.getBytes();
+                        sendData = msg.getBytes("UTF-8");
 
                         DatagramPacket sendPacket
                                 = new DatagramPacket(
@@ -190,7 +190,7 @@ public class Server {
                         socketMulticast.joinGroup(inetAddress);
 
                         dtgrm = new DatagramPacket(
-                                lists.get(i).getBytes(),
+                                lists.get(i).getBytes("UTF-8"),
                                 lists.get(i).length(),
                                 inetAddress,
                                 ChatConfig.getMcastPort());
