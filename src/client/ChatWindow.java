@@ -62,11 +62,6 @@ public class ChatWindow extends javax.swing.JFrame {
         jLabel1.setText(nickname);
         jLabel2.setText(roomName);
 
-        model.clear();
-        model.addElement("TODOS");
-        jList1.setModel(model);
-        jList1.setSelectedValue("TODOS", false);
-
         jTextField1.requestFocus();
 
         // para fazer o <ENTER> no jTextField realizar o clique do botão Enviar
@@ -120,8 +115,9 @@ public class ChatWindow extends javax.swing.JFrame {
                     String msg = new String(rec.getData());
 
                     mcastSocket.close();
-                    
+
                     if (msg.startsWith("LISTA:")) {
+                        System.out.println(msg);
                         updateUserList(msg);
                     } else {
                         updateMessageArea(msg);
@@ -219,6 +215,8 @@ public class ChatWindow extends javax.swing.JFrame {
         jLabel2 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
+        setResizable(false);
+        setSize(new java.awt.Dimension(783, 445));
 
         jList1.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         jScrollPane1.setViewportView(jList1);
@@ -282,7 +280,7 @@ public class ChatWindow extends javax.swing.JFrame {
                     .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                         .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 37, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(30, Short.MAX_VALUE))
         );
 
         pack();
@@ -313,24 +311,26 @@ public class ChatWindow extends javax.swing.JFrame {
         if (!(lastUserList.equals(userList))) {
 
             selectedValue = jList1.getSelectedValue();
-
             lastUserList = userList;
 
             split = userList.split(":");
 
-            if (split.length > 2) {
-                model.clear();
-                model.addElement("TODOS");
+            model.clear();
 
-                for (int i = 3; i < split.length; i++) {
+            model.addElement("TODOS");
+
+            for (int i = 3; i < split.length; i++) {
+                if (!split[i].equals(nickname)) {
                     model.addElement(split[i]);
                 }
-
-                split = null;
-
-                jList1.setModel(model);
             }
+
+            split = null;
+
+            jList1.setModel(model);
         }
+
+        jList1.repaint();
 
         jList1.setSelectedValue(selectedValue, false);
     }
@@ -338,8 +338,8 @@ public class ChatWindow extends javax.swing.JFrame {
     private void updateMessageArea(String msg) {
 
         jTextArea1.setText(jTextArea1.getText() + "\n" + msg);
-        jTextArea1.repaint();
         jTextArea1.setCaretPosition(jTextArea1.getDocument().getLength());
+        jTextArea1.repaint();
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
