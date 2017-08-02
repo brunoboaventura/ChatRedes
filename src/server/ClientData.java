@@ -9,7 +9,7 @@ public class ClientData implements Serializable {
     private String nickname;
     private Socket socketTCP;
     private InetAddress inetAddress;
-    private String sala;
+    private String room;
     private String ipMulticast;
     private int updPort;
    
@@ -43,12 +43,12 @@ public class ClientData implements Serializable {
         this.inetAddress = inetAddress;
     }
 
-    public String getSala() {
-        return sala;
+    public String getRoom() {
+        return room;
     }
 
-    public void setSala(String sala) {
-        this.sala = sala;
+    public void setRoom(String room) {
+        this.room = room;
     }
 
     public String getIpMulticast() {

@@ -124,7 +124,7 @@ public class Server {
                                 inetAddress = c.getInetAddress();
                             }
                         }
-                        
+
                         msg = split[1] + ":" + split[2];
                         sendData = msg.getBytes();
 
@@ -151,7 +151,7 @@ public class Server {
 
         // thread que vai atualizar a lista de usuarios das salas
         // padrão das mensagens:
-        // LIST:SALA:USUARIO1:USUARIO2:...
+        // LIST:SALA:IP_MULTICAST:USUARIO1:USUARIO2:...
         Runnable multicastServer;
         multicastServer = () -> {
             System.out.println("Servidor Multicast iniciado.");
@@ -160,8 +160,7 @@ public class Server {
             ArrayList<String> lists = new ArrayList();
 
             while (true) {
-                for (int i = 0; i < rooms.size(); i++) {
-                    Room room = rooms.get(i);
+                for (Room room : rooms) {
 
                     list = "LISTA:"
                             + room.getName()
@@ -169,12 +168,9 @@ public class Server {
                             + room.getIpMulticast()
                             + ":";
 
-                    if (clients.size() > 0) {
-                        for (int j = 0; j < clients.size(); j++) {
-                            ClientData cli = clients.get(j);
-                            if (room.getName().equals(cli.getSala())) {
-                                list += cli.getNickname() + ":";
-                            }
+                    for (ClientData cli : clients) {
+                        if (room.getName().equals(cli.getRoom())) {
+                            list += cli.getNickname() + ":";
                         }
                     }
                     //System.out.println(list);
@@ -295,7 +291,7 @@ public class Server {
                                 clientSocket.getInetAddress()
                         );
 
-                        cli.setSala(split[2]);
+                        cli.setRoom(split[2]);
 
                         for (Room room : rooms) {
                             if (room.getName().equals(split[2])) {
