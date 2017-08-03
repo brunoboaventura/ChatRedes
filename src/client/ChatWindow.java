@@ -536,7 +536,7 @@ public class ChatWindow extends javax.swing.JFrame {
             sendFileTCP(split[2], Integer.parseInt(split[3]));
 
         } else {
-            jTextArea1.setText(jTextArea1.getText() + "\n" + msg);
+            jTextArea1.setText(jTextArea1.getText() + "\n" + msg.trim());
             jTextArea1.setCaretPosition(jTextArea1.getDocument().getLength());
             jTextArea1.repaint();
         }
