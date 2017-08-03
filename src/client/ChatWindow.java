@@ -57,7 +57,7 @@ public class ChatWindow extends javax.swing.JFrame {
     private String lastUserList = "";
 
     private ChatFile file = null;
-    private String dirToSaveFile = "/tmp/";
+    private String dirToSaveFile;
 
     /**
      * Creates new form ChatWindow
@@ -69,12 +69,13 @@ public class ChatWindow extends javax.swing.JFrame {
             throws
             ParserConfigurationException, SAXException, IOException {
         initComponents();
-
+        
         this.nickname = nickname;
         this.roomName = roomName;
         this.multicastIp = multicastIp;
         this.udpPort = udpPort;
-
+        dirToSaveFile = System.getProperty("os.name").equals("Linux")?"/tmp":"%temp%";
+        
         jLabel1.setText(nickname);
         jLabel2.setText(roomName);
 
@@ -246,7 +247,13 @@ public class ChatWindow extends javax.swing.JFrame {
 
                     ChatFile file = (ChatFile) getObjectFromByte(objectAsByte);
 
-                    String dir = dirToSaveFile + "/" + file.getName();
+                    String dir = "";
+                    if(System.getProperty("os.name").equals("Linux")){
+                        dir = dirToSaveFile + "/" + file.getName();
+                    } else {
+                        dir = dirToSaveFile + "\\" + file.getName();
+                    }    
+                    
 
                     FileOutputStream fos = new FileOutputStream(dir);
                     fos.write(file.getData());
