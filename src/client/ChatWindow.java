@@ -1,25 +1,38 @@
 package client;
 
 import config.ChatConfig;
+import general.ChatFile;
 import general.General;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.DefaultListModel;
+import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -29,10 +42,12 @@ import org.xml.sax.SAXException;
 
 public class ChatWindow extends javax.swing.JFrame {
 
-    private Socket tcpSocket;
     private MulticastSocket mcastSocket;
 
     private int udpPort = 0;
+    private int tcpPort;
+
+    private String tcpServerIp;
 
     private final String nickname;
     private final String roomName;
@@ -41,11 +56,13 @@ public class ChatWindow extends javax.swing.JFrame {
     private DefaultListModel model = new DefaultListModel();
     private String lastUserList = "";
 
+    private ChatFile file = null;
+    private String dirToSaveFile = "/tmp/";
+
     /**
      * Creates new form ChatWindow
      */
     public ChatWindow(String nickname,
-            Socket tcpSocket,
             String roomName,
             String multicastIp,
             int udpPort)
@@ -54,7 +71,6 @@ public class ChatWindow extends javax.swing.JFrame {
         initComponents();
 
         this.nickname = nickname;
-        this.tcpSocket = tcpSocket;
         this.roomName = roomName;
         this.multicastIp = multicastIp;
         this.udpPort = udpPort;
@@ -63,11 +79,14 @@ public class ChatWindow extends javax.swing.JFrame {
         jLabel2.setText(roomName);
 
         jTextField1.requestFocus();
-        
+
         model.clear();
         model.addElement("TODOS");
         jList1.setModel(model);
         jList1.setSelectedValue("TODOS", false);
+        jList1.setFixedCellHeight(20);
+
+        jButton2.setEnabled(false);
 
         // para fazer o <ENTER> no jTextField realizar o clique do botão Enviar
         Action action = new AbstractAction() {
@@ -187,6 +206,63 @@ public class ChatWindow extends javax.swing.JFrame {
         Thread threadUdpReceiver = new Thread(udpReceiver);
         threadUdpReceiver.start();
 
+        // thread que receberá os arquivos
+        Runnable tcpFileReceiver;
+        tcpFileReceiver = () -> {
+            ServerSocket fileSocket = null;
+            try {
+                fileSocket = new ServerSocket(General.getAvailablePort());
+
+                tcpPort = fileSocket.getLocalPort();
+                tcpServerIp = fileSocket.getInetAddress().getHostAddress();
+
+                String port = String.valueOf(tcpPort);
+
+                String command = "TCP-SERVER-PORT:"
+                        + nickname
+                        + ":"
+                        + port
+                        + ":";
+
+                General.sendStringTCP(
+                        ChatConfig.getServerIp(),
+                        ChatConfig.getTcpPort2(),
+                        command);
+
+            } catch (IOException ex) {
+                Logger.getLogger(ChatWindow.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+            while (true) {
+
+                try {
+                    Socket socket = fileSocket.accept();
+
+                    System.out.println("entrou no accept...");
+                    byte[] objectAsByte = new byte[socket.getReceiveBufferSize()];
+                    BufferedInputStream bf = new BufferedInputStream(
+                            socket.getInputStream());
+                    bf.read(objectAsByte);
+
+                    ChatFile file = (ChatFile) getObjectFromByte(objectAsByte);
+
+                    String dir = dirToSaveFile + "/" + file.getName();
+
+                    FileOutputStream fos = new FileOutputStream(dir);
+                    fos.write(file.getData());
+                    fos.close();
+                    updateMessageArea("CHAT: Arquivo " + dir + " salvo com sucesso.");
+                } catch (IOException ex) {
+                    Logger.getLogger(ChatWindow.class.getName()).log(Level.SEVERE, null, ex);
+                }
+
+            }
+
+        };
+
+        Thread threadTcpServer = new Thread(tcpFileReceiver);
+        threadTcpServer.start();
+
     }
 
     public int getUdpPort() {
@@ -243,6 +319,11 @@ public class ChatWindow extends javax.swing.JFrame {
         });
 
         jButton2.setText("Send File");
+        jButton2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton2ActionPerformed(evt);
+            }
+        });
 
         jLabel1.setText("jLabel1");
 
@@ -304,7 +385,11 @@ public class ChatWindow extends javax.swing.JFrame {
                 General.sendStringMulticast(multicastIp, msg);
             } else {
                 General.sendStringToUDPServer(jList1.getSelectedValue() + ":" + msg);
-                updateMessageArea (msg);
+                try {
+                    updateMessageArea(msg);
+                } catch (UnknownHostException ex) {
+                    Logger.getLogger(ChatWindow.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
 
             jTextField1.setText("");
@@ -315,7 +400,60 @@ public class ChatWindow extends javax.swing.JFrame {
     private void jList1MouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jList1MouseClicked
         // TODO add your handling code here:
         jTextField1.requestFocus();
+        if (jList1.getSelectedValue().equals("TODOS")) {
+            jButton2.setEnabled(false);
+        } else {
+            jButton2.setEnabled(true);
+        }
     }//GEN-LAST:event_jList1MouseClicked
+
+    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
+        FileInputStream inputStream;
+        try {
+
+            JFileChooser chooser = new JFileChooser();
+            chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            chooser.setDialogTitle("Choose file to send");
+
+            if (chooser.showOpenDialog(this) == JFileChooser.OPEN_DIALOG) {
+                File fileSelected = chooser.getSelectedFile();
+
+                if (fileSelected.length() / 1024 >  2048 ) {
+                    JOptionPane.showMessageDialog(this,
+                                                 "The size of file is greater than 2MB.");
+                } else {
+                byte[] bFile = new byte[(int) fileSelected.length()];
+                inputStream = new FileInputStream(fileSelected);
+                inputStream.read(bFile);
+                inputStream.close();
+
+                long bytesSize = fileSelected.length();
+
+                file = new ChatFile();
+
+                file.setData(bFile);
+                file.setName(fileSelected.getName());
+                file.setSizeBytes(bytesSize);
+//                arquivo.setIpDestino(jTextFieldIP.getText());
+//                arquivo.setPortaDestino(jTextFieldPorta.getText());
+
+                General.sendStringToUDPServer(
+                        jList1.getSelectedValue()
+                        + ":"
+                        + nickname
+                        + ":"
+                        + "FILE:"
+                        + file.getName()
+                        + ":"
+                        + String.valueOf(file.getSizeBytes())
+                        + ":");
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }//GEN-LAST:event_jButton2ActionPerformed
 
     private void updateUserList(String userList) {
 
@@ -344,17 +482,115 @@ public class ChatWindow extends javax.swing.JFrame {
             jList1.setModel(model);
         }
 
-        jList1.repaint();
-
+        //jList1.repaint();
         jList1.setSelectedValue(selectedValue, false);
     }
 
-    private void updateMessageArea(String msg) {
+    private void updateMessageArea(String msg) throws UnknownHostException {
+        String[] split = msg.split(":");
 
-        jTextArea1.setText(jTextArea1.getText() + "\n" + msg);
-        jTextArea1.setCaretPosition(jTextArea1.getDocument().getLength());
-        jTextArea1.repaint();
+        if (split[1].equals("FILE")) {
+
+            int confirmFile = JOptionPane.showConfirmDialog(
+                    this,
+                    "The user " + split[0] + " wants to send you the file:\r\n"
+                    + split[2] + "(" + split[3] + " bytes). Do you Accept the "
+                    + "file?",
+                    "Do you want this file?",
+                    JOptionPane.YES_NO_OPTION);
+
+            System.out.println(confirmFile);
+
+            if (confirmFile == 0) {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                chooser.setDialogTitle("Choose the directory to save the file.");
+
+                if (chooser.showOpenDialog(this) == JFileChooser.OPEN_DIALOG) {
+                    File fileSelected = chooser.getSelectedFile();
+                    dirToSaveFile = fileSelected.getAbsolutePath();
+
+                    General.sendStringToUDPServer(
+                            split[0]
+                            + ":"
+                            + nickname
+                            + ":"
+                            + "FILE-ACCEPTED"
+                            + ":"
+                            + InetAddress.getLocalHost().getHostAddress()
+                            + ":"
+                            + String.valueOf(tcpPort)
+                            + ":");
+
+                }
+            }
+        } else if (split[1].equals("FILE-ACCEPTED")) {
+
+            sendFileTCP(split[2], Integer.parseInt(split[3]));
+
+        } else {
+            jTextArea1.setText(jTextArea1.getText() + "\n" + msg);
+            jTextArea1.setCaretPosition(jTextArea1.getDocument().getLength());
+            jTextArea1.repaint();
+        }
     }
+
+    private static Object getObjectFromByte(byte[] objectAsByte) {
+        Object obj = null;
+        ByteArrayInputStream bis = null;
+        ObjectInputStream ois = null;
+        try {
+            bis = new ByteArrayInputStream(objectAsByte);
+            ois = new ObjectInputStream(bis);
+            obj = ois.readObject();
+
+            bis.close();
+            ois.close();
+
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        return obj;
+
+    }
+
+    private void sendFileTCP(String ip, int port) {
+        try {
+            Socket socket = new Socket(ip, port);
+
+            BufferedOutputStream bf = new BufferedOutputStream(socket.getOutputStream());
+
+            byte[] bytea = serializeFile();
+            bf.write(bytea);
+            bf.flush();
+            bf.close();
+            socket.close();
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private byte[] serializeFile() {
+        try {
+            ByteArrayOutputStream bao = new ByteArrayOutputStream();
+            ObjectOutputStream ous;
+            ous = new ObjectOutputStream(bao);
+            ous.writeObject(file);
+            return bao.toByteArray();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;

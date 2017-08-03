@@ -172,7 +172,6 @@ public class LoginWindow extends javax.swing.JFrame {
 
                 window = new ChatWindow(
                         nickname,
-                        tcpSocket2,
                         roomName,
                         multicastIp,
                         udpPort);

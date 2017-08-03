@@ -78,6 +78,8 @@ public class Server {
 
                     // o socket UDP ficará aguardando os mensagens:
                     // MESSAGE:NICKNAME_DESTINO:NICKNAME_ORIGEM:TEXTO
+                    // ou
+                    // NICKNAME_DESTINO:NICKNAME_ORIGEM:FILE:NOME_ARQUIVO:TAMANHO_KB
                     DatagramSocket socketUDP = new DatagramSocket(ChatConfig.getUdpPort());
 
                     byte[] receiveData = new byte[ChatConfig.getMessageMaxLength()];
@@ -124,8 +126,19 @@ public class Server {
                                 inetAddress = c.getInetAddress();
                             }
                         }
+                        
+                        
 
-                        msg = split[1] + ":" + split[2];
+                        if (split[2].startsWith("FILE")) {
+
+                            msg = msg.replace(split[0] + ":", "");
+
+                        } else {
+
+                            msg = split[1] + ":" + split[2];
+
+                        }
+
                         sendData = msg.getBytes("UTF-8");
 
                         DatagramPacket sendPacket
@@ -328,6 +341,17 @@ public class Server {
                         for (ClientData client : clients) {
                             if (client.getNickname().equals(split[1])) {
                                 client.setUpdPort(Integer.parseInt(split[2]));
+                                break;
+                            }
+                        }
+                    }
+
+                    if ((command != null) && command.startsWith("TCP-SERVER-PORT:")) {
+                        split = command.split(":");
+
+                        for (ClientData client : clients) {
+                            if (client.getNickname().equals(split[1])) {
+                                client.setTcpPort(Integer.parseInt(split[2]));
                                 break;
                             }
                         }

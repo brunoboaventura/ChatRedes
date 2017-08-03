@@ -1,6 +1,8 @@
 package general;
 
 import config.ChatConfig;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -8,6 +10,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -90,7 +93,7 @@ public class General {
         try {
             DatagramSocket socketUDP = new DatagramSocket();
             byte[] sendData = new byte[ChatConfig.getMessageMaxLength()];
-            
+
             sendData = msg.getBytes("UTF-8");
 
             DatagramPacket sendPacket
@@ -101,7 +104,7 @@ public class General {
                             ChatConfig.getUdpPort());
 
             socketUDP.send(sendPacket);
-            
+
             socketUDP.close();
 
         } catch (IOException ex) {
@@ -109,4 +112,23 @@ public class General {
 
         }
     }
+
+    public static int getAvailablePort() {
+        int port = 6100;
+        boolean result = false;
+
+        while (result == false) {
+            try {
+                ServerSocket s = new ServerSocket(port);
+                s.close();
+                result = true;
+
+            } catch (Exception e) {
+                result = false;
+                port++;
+            }
+        }
+        return (port);
+    }
+
 }

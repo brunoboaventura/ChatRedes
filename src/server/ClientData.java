@@ -12,6 +12,7 @@ public class ClientData implements Serializable {
     private String room;
     private String ipMulticast;
     private int updPort;
+    private int tcpPort;
    
     public ClientData (String nickname, Socket socket, InetAddress inetAddress) {
         this.nickname = nickname;
@@ -67,4 +68,13 @@ public class ClientData implements Serializable {
         this.updPort = updPort;
     }
 
+    public int getTcpPort() {
+        return tcpPort;
+    }
+
+    public void setTcpPort(int tcpPort) {
+        this.tcpPort = tcpPort;
+    }
+
+    
 }
